@@ -1,45 +1,61 @@
-use rules::*;
-
-#[test]
-fn validate_range() {
-	assert!(range(1,7).validate(&1).is_ok());
-	assert!(range(1,7).validate(&2).is_ok());
-	assert!(range(1,7).validate(&6).is_ok());
-	assert!(range(1,7).validate(&7).is_ok());
-
-	assert!(range(1,7).validate(&0).is_err());
-	assert!(range(1,7).validate(&8).is_err());
-}
-
-#[test]
-fn convert_range() {
-	assert!(range(1,7).convert(&"1").is_ok());
-	assert!(range(1,7).convert(&"2").is_ok());
-	assert!(range(1,7).convert(&"6").is_ok());
-	assert!(range(1,7).convert(&"7").is_ok());
-
-	assert!(range(1,7).convert(&"0").is_err());
-	assert!(range(1,7).convert(&"8").is_err());
-	assert!(range(1,7).convert(&"a").is_err());
-}
+use Schema;
 
 #[test]
 fn validate_regex(){
-	assert!(match_regex("h..h").validate(&"haah".to_string()).is_ok());
-	assert!(match_regex("h..h").validate(&"aargh".to_string()).is_err());
+	assert!(Schema::new().match_regex("h..h").validate(&"haah").is_ok());
+	assert!(Schema::new().match_regex("h..h").validate(&"aargh").is_err());
+}
+
+
+#[test]
+fn validate_range() {
+	assert!(Schema::new().range(1..2).validate(&1).is_ok());
+	assert!(Schema::new().range(1..).validate(&1).is_ok());
+	assert!(Schema::new().range(1..).validate(&2).is_ok());
+	assert!(Schema::new().range(..2).validate(&1).is_ok());
+	assert!(Schema::new().range(..).validate(&1).is_ok());
+	
+	assert!(Schema::new().range(1..2).validate(&0).is_err());
+	assert!(Schema::new().range(1..2).validate(&2).is_err());
+	assert!(Schema::new().range(1..).validate(&0).is_err());
+	assert!(Schema::new().range(..2).validate(&2).is_err());
+}
+
+
+#[test]
+fn validate_length(){
+	assert!(Schema::new().length(4).validate(&"1234").is_ok());
+	assert!(Schema::new().length(1..3).validate(&"1").is_ok());
+	assert!(Schema::new().length(1..3).validate(&"12").is_ok());
+	assert!(Schema::new().length(..3).validate(&"12").is_ok());
+	assert!(Schema::new().length(2..).validate(&"12").is_ok());
+	assert!(Schema::new().length(..).validate(&"12").is_ok());
+	
+	assert!(Schema::new().length(4).validate(&"123").is_err());
+	assert!(Schema::new().length(1..3).validate(&"").is_err());
+	assert!(Schema::new().length(1..3).validate(&"123").is_err());
+	assert!(Schema::new().length(..3).validate(&"123").is_err());
+	assert!(Schema::new().length(2..).validate(&"1").is_err());
 }
 
 #[test]
 fn validate_email() {
-	assert!(email().convert(&"test@domain.com").is_ok());
-	assert!(email().convert(&"test@domaincom").is_err());
-	assert!(email().convert(&"testdomain.com").is_err());
-	assert!(email().convert(&"@domaincom").is_err());
-	assert!(email().convert(&"@domain.com").is_err());
-	assert!(email().convert(&"test@").is_err());
-	assert!(email().convert(&"test").is_err());
+	assert!(Schema::new().email().validate(&"test@domain.com").is_ok());
+	assert!(Schema::new().email().validate(&"test123+123@domain.com").is_ok());
+	assert!(Schema::new().email().validate(&"test123.4@domain.com").is_ok());
+	assert!(Schema::new().email().validate(&"test1.2.3.4@domain.com").is_ok());
+	
+	assert!(Schema::new().email().validate(&"test@domaincom").is_err());
+	assert!(Schema::new().email().validate(&"testdomain.com").is_err());
+	assert!(Schema::new().email().validate(&"@domaincom").is_err());
+	assert!(Schema::new().email().validate(&"@domain.com").is_err());
+	assert!(Schema::new().email().validate(&"test@").is_err());
+	assert!(Schema::new().email().validate(&"test").is_err());
+}
 
-	assert!(email().convert(&"test123+123@domain.com").is_ok());
-	assert!(email().convert(&"test123.4@domain.com").is_ok());
-	assert!(email().convert(&"test1.2.3.4@domain.com").is_ok());
+#[test]
+fn validate_complex(){
+	let schema = Schema::new().email().length(1..100);
+	assert!(schema.validate(&"test@domain.com").is_ok());
+	assert!(schema.validate(&"notvalidemail").is_err());
 }
