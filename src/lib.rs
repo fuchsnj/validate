@@ -5,5 +5,4 @@ mod bound;
 
 pub mod rules;
 
-pub use rule::{Rule, ValidationResult, ValidationError};
-pub use rules::*;
+pub use rule::{Rule, ValidationResult, Error};

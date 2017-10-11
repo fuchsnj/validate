@@ -1,4 +1,4 @@
-use super::{Rule, ValidationError};
+use super::{Rule, ValidationResult, Error};
 use super::bound::Bound;
 use regex::Regex;
 use std::fmt::Display;
@@ -8,7 +8,7 @@ pub fn whitelist_chars(whitelist: &str) -> Rule<str> {
 	Rule::from(move |input: &str| {
 		for c in input.chars() {
 			if !whitelist.contains(c) {
-				return Err(ValidationError(format!("cannot contain the character '{}'", c)));
+				return Err(format!("cannot contain the character '{}'", c).into());
 			}
 		}
 		Ok(())
@@ -21,7 +21,7 @@ pub fn regex(pattern: &str, description: &str) -> Rule<str> {
 	Rule::from(move |input: &str| {
 		match regex.is_match(input) {
 			true => Ok(()),
-			false => Err(ValidationError(format!("must be {}", description)))
+			false => Err(format!("must be {}", description).into())
 		}
 	})
 }
@@ -39,28 +39,28 @@ pub fn bound<T, R>(bound: R) -> Rule<T>
 			if input < &end {
 				Ok(())
 			} else {
-				Err(ValidationError(format!("must be < {}", end)))
+				Err(format!("must be < {}", end).into())
 			}
 		}),
 		Bound::Range(start, end) => Rule::from(move |input: &T| {
 			if input >= &start && input < &end {
 				Ok(())
 			} else {
-				Err(ValidationError(format!("must be >= {} and < {}", start, end)))
+				Err(format!("must be >= {} and < {}", start, end).into())
 			}
 		}),
 		Bound::Exact(value) => Rule::from(move |input: &T| {
 			if input == &value {
 				Ok(())
 			} else {
-				Err(ValidationError(format!("must equal {}", value)))
+				Err(format!("must equal {}", value).into())
 			}
 		}),
 		Bound::RangeFrom(start) => Rule::from(move |input: &T| {
 			if input >= &start {
 				Ok(())
 			} else {
-				Err(ValidationError(format!("must be >= {}", start)))
+				Err(format!("must be >= {}", start).into())
 			}
 		})
 	}
@@ -68,11 +68,10 @@ pub fn bound<T, R>(bound: R) -> Rule<T>
 
 #[test]
 fn validate_length() {
-	assert!(Rule::map("length", str::len, bound(1..5)).validate("1234").is_ok());
-	assert!(Rule::map("length", str::len, bound(1..5)).validate("12345").is_err());
-	assert_eq!(Rule::map("length", str::len, bound(2)).validate("1").unwrap_err().0, "length must equal 2");
+	let rule = bound(1..5).name("length").map(str::len);
+	assert!(rule.validate("1234").is_ok());
+	assert!(rule.validate("12345").is_err());
 }
-
 
 
 #[test]
@@ -92,11 +91,18 @@ fn validate_nest() {
 		x: 1,
 		y: "test".to_owned()
 	};
-	assert!(Rule::nest("x", TestData::get_x, bound(1)).validate(&data).is_ok());
-	assert_eq!(Rule::nest("x", TestData::get_x, bound(2)).validate(&data).unwrap_err().0, "x must equal 2".to_owned());
-	assert!(Rule::nest("y", |d: &TestData| &d.y,
-	                   Rule::map("length", String::len, bound(4) + bound(3..6))).validate(&data).is_ok()
-	);
+
+	let rule = Rule::from(move |data: &TestData| {
+				bound(0..5).name("x").validate(&data.x)?;
+				bound(..5).name("y length").validate(&data.y.len())?;
+		Ok(())
+	});
+	//
+	assert!(rule.validate(&data).is_ok());
+		assert_eq!(rule.validate(&TestData {
+			x: 3,
+			y: "too long".to_owned()
+		}).unwrap_err().get_message(), "y length must be < 5".to_owned())
 }
 
 

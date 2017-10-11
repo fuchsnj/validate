@@ -1,12 +1,38 @@
 use std::ops::Add;
 
 #[derive(Debug, PartialEq)]
-pub struct ValidationError(pub String);
+pub struct Error {
+	message: String
+}
 
-pub type ValidationResult = Result<(), ValidationError>;
+impl Error {
+	pub fn get_message(&self) -> String {
+		self.message.clone()
+	}
+}
+
+impl<S: Into<String>> From<S> for Error {
+	fn from(msg: S) -> Self {
+		Error { message: msg.into() }
+	}
+}
+
+
+pub type ValidationResult = Result<(), Error>;
 
 pub struct Rule<T: ? Sized> {
 	rule: Box<Fn(&T) -> ValidationResult>
+}
+
+impl<T: 'static> Rule<T> {
+	pub fn map<'b, F, U>(self, get: F) -> Rule<U>
+		where F: Fn(&U) -> T + 'static,
+		      U: ? Sized + 'static {
+		Rule::from(move |input: &U| {
+			let mapped_input = get(input);
+			self.validate(&mapped_input)
+		})
+	}
 }
 
 impl<T: ? Sized + 'static> Rule<T> {
@@ -14,38 +40,32 @@ impl<T: ? Sized + 'static> Rule<T> {
 		(*self.rule)(input)
 	}
 
-	pub fn nest<'b, R, F, U>(name: &str, get: F, rule: R) -> Self
+	pub fn nest<'b, R, F, U>(get: F, rule: R) -> Self
 		where
 				R: Into<Rule<U>>,
 				F: Fn(&T) -> &U + 'static,
 				U: ? Sized + 'static {
-		let name = name.to_owned();
 		let converted_rule = rule.into();
 		Rule::from(move |input: &T| {
 			let mapped_input = get(input);
-			converted_rule.validate(&mapped_input).map_err(|err: ValidationError| {
-				ValidationError(name.clone() + " " + &err.0)
-			})
+			converted_rule.validate(&mapped_input)
 		})
 	}
 
-	pub fn map<'b, R, F, U>(name: &str, get: F, rule: R) -> Self
-		where
-				R: Into<Rule<U>>,
-				F: Fn(&T) -> U + 'static,
-				U: 'static {
+
+	pub fn name(self, name: &str) -> Self {
 		let name = name.to_owned();
-		let converted_rule = rule.into();
 		Rule::from(move |input: &T| {
-			let mapped_input = get(input);
-			converted_rule.validate(&mapped_input).map_err(|err: ValidationError| {
-				ValidationError(name.clone() + " " + &err.0)
+			self.validate(&input).map_err(|err: Error| {
+				(name.clone() + " " + &err.get_message()).into()
 			})
 		})
 	}
 }
 
-impl<T: ? Sized, F: Fn(&T) -> ValidationResult + 'static> From<F> for Rule<T> {
+impl<T, F> From<F> for Rule<T>
+	where F: Fn(&T) -> ValidationResult + 'static,
+	      T: ? Sized {
 	fn from(func: F) -> Self {
 		Rule {
 			rule: Box::new(func)
