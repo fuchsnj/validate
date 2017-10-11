@@ -20,7 +20,7 @@ extern crate validate;
 ## Example
 
 ```rust
-use validate::Schema;
-let schema = Schema::new().email().length(1..100);
-assert!(schema.validate(&"test@domain.com").is_ok());
-assert!(schema.validate(&"notvalidemail").is_err());
+use validate::*;
+
+assert!(email().validate(&"test@domain.com").is_ok());
+assert!(bound(..3).validate(&2).is_ok())
