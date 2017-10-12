@@ -11,6 +11,6 @@ pub trait Validate: 'static {
 	fn get_validation_rule(&self) -> Rule<Self>;
 
 	fn validate(&self) -> ValidationResult {
-		Self::get_validation_rule().validate(self)
+		self.get_validation_rule().validate(self)
 	}
 }
