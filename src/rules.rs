@@ -1,4 +1,4 @@
-use super::{Rule, ValidationResult, Error};
+use super::Rule;
 use super::bound::Bound;
 use regex::Regex;
 use std::fmt::Display;
@@ -79,12 +79,6 @@ fn validate_nest() {
 	struct TestData {
 		pub x: u32,
 		pub y: String
-	}
-
-	impl TestData {
-		fn get_x(&self) -> &u32 {
-			&self.x
-		}
 	}
 
 	let data = TestData {
